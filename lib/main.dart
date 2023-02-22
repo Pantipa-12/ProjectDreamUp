@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:compro/pages/first_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+StreamController<double> streamController = StreamController<double>();
+StreamController<int> streamControllerInt =
+    StreamController<int>();
 
 void main() {
   runApp(const MyApp());
@@ -16,10 +22,13 @@ class MyApp extends StatelessWidget {
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: GoogleFonts.marmelad().fontFamily
+          useMaterial3: true,
+          colorSchemeSeed: Colors.amber,
+          fontFamily: GoogleFonts.marmelad().fontFamily),
+      home: FirstPage(
+        stream: streamController.stream,
+        streamRemoveList: streamControllerInt.stream,
       ),
-      home: const FirstPage(),
     );
   }
 }

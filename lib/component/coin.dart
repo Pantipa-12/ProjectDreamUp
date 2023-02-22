@@ -1,25 +1,37 @@
+import 'package:animated_flip_counter/animated_flip_counter.dart';
 import 'package:flutter/material.dart';
 
 class Coin extends StatelessWidget {
   final String imagePath;
-  const Coin({super.key, required this.imagePath});
+  final int money;
+  const Coin({super.key, required this.imagePath, required this.money});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: 50,
-        height: 50,
-        margin: EdgeInsets.all(15),
-        padding: EdgeInsets.all(2),
+        margin: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-            color: Colors.grey[400],
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(16)),
-        child: Row(
-          children: [
-            Image.asset(imagePath, height: 15, width: 15),
-            Text(" x 123", style: TextStyle(color: Colors.black, fontSize: 10))
-          ],
+            color: Colors.grey, borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Image.asset(
+                imagePath,
+                height: 17,
+                width: 17,
+                fit: BoxFit.cover,
+              ),
+              AnimatedFlipCounter(
+                duration: const Duration(milliseconds: 4500),
+                value: money,
+                textStyle: const TextStyle(fontSize: 14, color: Colors.black),
+                prefix: ' x ',
+              )
+            ],
+          ),
         ));
   }
 }

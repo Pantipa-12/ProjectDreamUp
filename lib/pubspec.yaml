@@ -37,6 +37,11 @@ dependencies:
   google_fonts: ^4.0.3
   dropdown_button2: ^1.9.2
   flutter_gif: ^0.0.4
+  percent_indicator: ^4.2.2
+  awesome_dialog: ^3.0.2
+  animate_do: ^3.0.2
+  animated_flip_counter: ^0.2.5
+  confetti: ^0.7.0
 
 dev_dependencies:
   flutter_test:
