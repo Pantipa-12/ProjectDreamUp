@@ -1,37 +1,35 @@
-import 'package:compro/component/confirmDone.dart';
+import 'package:compro/pages/first_page.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class BuildList extends StatelessWidget {
-  final Color color;
-  final String text;
-  final int id;
+  ToDoList toDoList;
 
-  const BuildList(
-      {super.key, required this.color, required this.text, required this.id});
+  BuildList({super.key, required this.toDoList});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-            context: context,
-            builder: (context) =>
-                ConfirmDone(color: color, text: text, id: id));
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            backgroundColor: color,
-            radius: 10,
-          ),
-          const SizedBox(width: 15),
-          Text(
-            text,
-            style: GoogleFonts.marmelad(color: Colors.black, fontSize: 15),
-          )
-        ],
+    return Container(
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          color: const Color.fromARGB(255, 255, 248, 230),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.grey.shade400,
+                blurRadius: 5,
+                offset: const Offset(0, 5))
+          ]),
+      margin: const EdgeInsets.only(bottom: 15),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: toDoList.color,
+          radius: 13,
+        ),
+        title: Text(
+          toDoList.title,
+          style: const TextStyle(fontSize: 24),
+        ),
+        subtitle: Text(toDoList.describe),
+        isThreeLine: true,
       ),
     );
   }
