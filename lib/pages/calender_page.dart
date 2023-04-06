@@ -1,11 +1,14 @@
-import 'dart:html';
-import 'dart:math';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:compro/component/coin.dart';
 import 'package:compro/pages/first_page.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:compro/utils/utils.dart';
 
@@ -17,12 +20,25 @@ class Calender extends StatefulWidget {
   State<Calender> createState() => _CalenderState();
 }
 
+final Map<String, String> sticker = {
+  "cake": "lib/images/Stickers/cake.png",
+  "cat": "lib/images/Stickers/cat.png",
+  "dog": "lib/images/Stickers/dog.png"
+};
+
 final _formKey = GlobalKey<FormState>();
 String title = "";
 
+var _x = 0.0;
+var _y = 0.0;
+final GlobalKey stackKey = GlobalKey();
+
+final List<String> dropdown = ['Add event', 'Add sticker'];
+int? selectedSticker;
+bool showDrag = false;
+
 class _CalenderState extends State<Calender> {
-  late Map<DateTime, List<Event>> kEvent;
-  late final ValueNotifier<List<Event>> _selectedEvents;
+  late Map<DateTime, dynamic> kEvent;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   RangeSelectionMode _rangeSelectionMode = RangeSelectionMode
       .toggledOff; // Can be toggled on/off by longpressing a date
@@ -30,6 +46,7 @@ class _CalenderState extends State<Calender> {
   DateTime _selectedDay = DateTime.now();
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
+  late SharedPreferences prefs;
 
   void showAddEvent(DateTime? dateTime) => showDialog(
         context: context,
@@ -63,11 +80,13 @@ class _CalenderState extends State<Calender> {
               FilledButton(
                   onPressed: () {
                     if (kEvent[_selectedDay] != null) {
-                      kEvent[_selectedDay]?.add(Event(title));
+                      kEvent[_selectedDay]?.add(title);
                     } else {
-                      kEvent[_selectedDay] = [Event(title)];
+                      kEvent[_selectedDay] = [title];
                     }
-                    setState(() {});
+                    setState(() {
+                      prefs.setString("events", json.encode(encodeMap(kEvent)));
+                    });
                     Navigator.pop(context);
                   },
                   child: const Text("Add"))
@@ -76,22 +95,45 @@ class _CalenderState extends State<Calender> {
         ),
       );
 
+  Map<String, dynamic> encodeMap(Map<DateTime, dynamic> map) {
+    Map<String, dynamic> newMap = {};
+    map.forEach((key, value) {
+      newMap[key.toString()] = map[key]!;
+    });
+    return newMap;
+  }
+
+  Map<DateTime, dynamic> decodeMap(Map<String, dynamic> map) {
+    Map<DateTime, dynamic> newMap = {};
+    map.forEach((key, value) {
+      newMap[DateTime.parse(key)] = map[key]!;
+    });
+    return newMap;
+  }
+
+  prefsData() async {
+    prefs = await SharedPreferences.getInstance();
+    setState(() {
+      kEvent = Map<DateTime, dynamic>.from(
+          decodeMap(json.decode(prefs.getString("events") ?? "{}")));
+    });
+  }
+
   @override
   void initState() {
-    kEvent = {};
     super.initState();
 
+    kEvent = {};
     _selectedDay = _focusedDay;
-    _selectedEvents = ValueNotifier([]);
+    prefsData();
   }
 
   @override
   void dispose() {
-    _selectedEvents.dispose();
     super.dispose();
   }
 
-  List<Event> _getEventsForDay(DateTime day) {
+  List<dynamic> _getEventsForDay(DateTime day) {
     return kEvent[day] ?? [];
   }
 
@@ -123,100 +165,171 @@ class _CalenderState extends State<Calender> {
       backgroundColor: const Color(0xFFf9f6ef),
       floatingActionButton: Padding(
         padding: const EdgeInsets.fromLTRB(0, 0, 20, 20),
-        child: FloatingActionButton(
-          onPressed: () => showAddEvent(_selectedDay),
-          child: const Icon(Icons.add),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton2(
+            dropdownWidth: 160,
+            dropdownDirection: DropdownDirection.left,
+            dropdownDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color: const Color.fromARGB(255, 255, 248, 230)),
+            customButton: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Colors.grey,
+                        spreadRadius: 1,
+                        blurRadius: 15,
+                        offset: Offset(0, 5))
+                  ],
+                  color: const Color.fromARGB(255, 255, 231, 174),
+                  borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.add),
+            ),
+            items: dropdown
+                .map((item) => DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(item),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                switch (value) {
+                  case "Add event":
+                    showAddEvent(_selectedDay);
+                    break;
+                  case "Add sticker":
+                    showSticker();
+                    break;
+                }
+              });
+            },
+            buttonDecoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(4)),
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+      body: SafeArea(
+        child: Stack(
+          key: stackKey,
+          fit: StackFit.expand,
           children: [
-            TableCalendar<Event>(
-              firstDay: kFirstDay,
-              lastDay: kLastDay,
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              rangeStartDay: _rangeStart,
-              rangeEndDay: _rangeEnd,
-              calendarFormat: _calendarFormat,
-              rangeSelectionMode: _rangeSelectionMode,
-              eventLoader: _getEventsForDay,
-              startingDayOfWeek: StartingDayOfWeek.monday,
-              headerStyle: const HeaderStyle(
-                  decoration: BoxDecoration(color: Color(0xFFfff0cc)),
-                  headerMargin: EdgeInsets.only(bottom: 8)),
-              calendarStyle: const CalendarStyle(
-                outsideDaysVisible: false,
-              ),
-              onDaySelected: _onDaySelected,
-              onFormatChanged: (format) {
-                if (_calendarFormat != format) {
-                  setState(() {
-                    _calendarFormat = format;
-                  });
-                }
-              },
-              onPageChanged: (focusedDay) {
-                _focusedDay = focusedDay;
-              },
-            ),
-            ..._getEventsForDay(_selectedDay).map(
-              (Event event) => SlidableAutoCloseBehavior(
-                closeWhenOpened: true,
-                child: Slidable(
-                  closeOnScroll: false,
-                  startActionPane: ActionPane(
-                    motion: const StretchMotion(),
-                    children: [
-                      SlidableAction(
-                          borderRadius: BorderRadius.circular(20),
-                          padding: const EdgeInsets.all(10),
-                          backgroundColor: Colors.red.shade300,
-                          icon: Icons.delete,
-                          label: 'Delete',
-                          onPressed: (context) =>
-                              _onRemove(_selectedDay, event)),
-                      SlidableAction(
-                          borderRadius: BorderRadius.circular(20),
-                          padding: const EdgeInsets.all(10),
-                          backgroundColor: Colors.yellow.shade300,
-                          icon: Icons.edit,
-                          label: 'Edit',
-                          onPressed: (context) => _onEdit(_selectedDay, event))
-                    ],
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        color: const Color.fromARGB(255, 255, 248, 230),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.grey.shade400,
-                              blurRadius: 5,
-                              offset: const Offset(0, 5))
-                        ]),
-                    margin: const EdgeInsets.only(bottom: 15),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.orange,
-                        radius: 12,
+            SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    TableCalendar<dynamic>(
+                      firstDay: kFirstDay,
+                      lastDay: kLastDay,
+                      focusedDay: _focusedDay,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDay, day),
+                      rangeStartDay: _rangeStart,
+                      rangeEndDay: _rangeEnd,
+                      calendarFormat: _calendarFormat,
+                      rangeSelectionMode: _rangeSelectionMode,
+                      eventLoader: _getEventsForDay,
+                      startingDayOfWeek: StartingDayOfWeek.monday,
+                      headerStyle: const HeaderStyle(
+                          decoration: BoxDecoration(color: Color(0xFFfff0cc)),
+                          headerMargin: EdgeInsets.only(bottom: 8)),
+                      calendarStyle: const CalendarStyle(
+                        outsideDaysVisible: false,
                       ),
-                      title: Text(
-                        event.title,
-                        style: const TextStyle(fontSize: 20),
-                      ),
-                      subtitle: Text(
-                        DateFormat.yMMMMEEEEd().format(_selectedDay),
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      isThreeLine: true,
+                      onDaySelected: _onDaySelected,
+                      onFormatChanged: (format) {
+                        if (_calendarFormat != format) {
+                          setState(() {
+                            _calendarFormat = format;
+                          });
+                        }
+                      },
+                      onPageChanged: (focusedDay) {
+                        _focusedDay = focusedDay;
+                      },
                     ),
-                  ),
+                    ..._getEventsForDay(_selectedDay).map(
+                      (dynamic event) => SlidableAutoCloseBehavior(
+                        closeWhenOpened: true,
+                        child: Slidable(
+                          closeOnScroll: false,
+                          startActionPane: ActionPane(
+                            motion: const StretchMotion(),
+                            children: [
+                              SlidableAction(
+                                  borderRadius: BorderRadius.circular(20),
+                                  padding: const EdgeInsets.all(10),
+                                  backgroundColor: Colors.red.shade300,
+                                  icon: Icons.delete,
+                                  label: 'Delete',
+                                  onPressed: (context) =>
+                                      _onRemove(_selectedDay, event)),
+                              SlidableAction(
+                                  borderRadius: BorderRadius.circular(20),
+                                  padding: const EdgeInsets.all(10),
+                                  backgroundColor: Colors.yellow.shade300,
+                                  icon: Icons.edit,
+                                  label: 'Edit',
+                                  onPressed: (context) =>
+                                      _onEdit(_selectedDay, event))
+                            ],
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(15),
+                                color: const Color.fromARGB(255, 255, 248, 230),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.grey.shade400,
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 5))
+                                ]),
+                            margin: const EdgeInsets.only(bottom: 15),
+                            child: ListTile(
+                              leading: const CircleAvatar(
+                                backgroundColor: Colors.orange,
+                                radius: 12,
+                              ),
+                              title: Text(
+                                event,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              subtitle: Text(
+                                DateFormat.yMMMMEEEEd().format(_selectedDay),
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              isThreeLine: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            showDrag
+                ? Positioned(
+                    left: _x,
+                    top: _y,
+                    child: Draggable(
+                      feedback: displaySticker(selectedSticker!),
+                      childWhenDragging: Container(),
+                      onDragEnd: (dragdetails) {
+                        setState(() {
+                          final parentPos = stackKey.globalPaintBounds;
+                          if (parentPos == null) return;
+                          _x = dragdetails.offset.dx - parentPos.left;
+                          _y = dragdetails.offset.dy - parentPos.top;
+                        });
+                      },
+                      child: displaySticker(selectedSticker!),
+                    ),
+                  )
+                : const SizedBox()
           ],
         ),
       ),
@@ -251,6 +364,11 @@ class _CalenderState extends State<Calender> {
   }
 
   void _onRemove(key, event) {
+    Map<DateTime, dynamic> map = Map<DateTime, dynamic>.from(
+        decodeMap(json.decode(prefs.getString("events") ?? "{}")));
+    map[key]?.remove(event);
+    prefs.setString("events", json.encode(encodeMap(map)));
+
     setState(() {
       kEvent[key]?.remove(event);
     });
@@ -287,9 +405,15 @@ class _CalenderState extends State<Calender> {
             actions: [
               FilledButton(
                   onPressed: () {
+                    Map<DateTime, dynamic> map = Map<DateTime, dynamic>.from(
+                        decodeMap(
+                            json.decode(prefs.getString("events") ?? "{}")));
                     int index = kEvent[key]!.indexOf(event);
+                    map[key]![index] = title;
+                    prefs.setString("events", json.encode(encodeMap(map)));
+
                     setState(() {
-                      kEvent[key]![index] = Event(title);
+                      kEvent[key]![index] = title;
                     });
                     Navigator.pop(context);
                   },
@@ -298,4 +422,57 @@ class _CalenderState extends State<Calender> {
           ),
         ),
       );
+
+  void showSticker() => showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+            title: const Text('Add sticker'),
+            content: SizedBox(
+              width: 100,
+              height: 200,
+              child: ListView.builder(
+                itemCount: sticker.length,
+                itemBuilder: (context, index) {
+                  String key = sticker.keys.elementAt(index);
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedSticker = index;
+                        showDrag = true;
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: Card(
+                      child: ListTile(
+                        leading: Image.asset(
+                          "${sticker[key]}",
+                          height: 30,
+                          width: 30,
+                        ),
+                        title: Text(key),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ));
+
+  Widget displaySticker(int index) {
+    String key = sticker.keys.elementAt(index);
+    return Image.asset("${sticker[key]}", width: 60, height: 50);
+  }
+}
+
+extension GlobalKeyExtension on GlobalKey {
+  Rect? get globalPaintBounds {
+    final renderObject = currentContext?.findRenderObject();
+    var translation = renderObject?.getTransformTo(null).getTranslation();
+    if (translation != null && renderObject?.paintBounds != null) {
+      return renderObject!.paintBounds
+          .shift(Offset(translation.x, translation.y));
+    } else {
+      return null;
+    }
+  }
 }

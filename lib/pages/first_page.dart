@@ -29,7 +29,7 @@ String title = "";
 String describe = "";
 Color color = Colors.black;
 List<Widget> listOfWidget = [];
-int money = 125;
+int money = 0;
 double percent = 0;
 int _selectedIndex = 0;
 
